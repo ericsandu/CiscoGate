@@ -199,3 +199,41 @@ class TranslationTrie:
         reverse_trie.add_translation(
             mode, reverse_path, reverse_translate_str, metadata
         )
+
+    def remove_translation(self, mode: str, path: List[str]) -> bool:
+        """
+        Removes a translation path from the trie and prunes empty branches.
+        Returns True if successful, False if the path was not found.
+        """
+        if mode not in self.dictionary["modes"]:
+            return False
+
+        current = self.dictionary["modes"][mode]
+        nodes = [(current, None)]  # list of (parent_dict, key_to_reach_child)
+
+        for token in path:
+            if token not in current:
+                return False
+            nodes.append((current[token], token))
+            current = current[token]
+
+        # Verify it's a translation endpoint
+        if "_translate" not in current:
+            return False
+
+        # Remove translation metadata
+        current.pop("_translate", None)
+        current.pop("_enters_mode", None)
+        current.pop("_exits_mode", None)
+        current.pop("_allowed_roles", None)
+
+        # Prune empty dictionaries upwards
+        for i in range(len(nodes) - 1, 0, -1):
+            child_node, key_to_child = nodes[i]
+            parent_node, _ = nodes[i - 1]
+            if not child_node:  # Dictionary is empty
+                del parent_node[key_to_child]
+            else:
+                break
+
+        return True
