@@ -1,4 +1,4 @@
-import re
+import json
 from typing import List, Tuple, Dict, Any
 
 
@@ -18,6 +18,18 @@ class TranslationTrie:
 
         if "modes" not in self.dictionary:
             raise ValueError("Invalid dictionary format: missing 'modes' root key.")
+
+    @classmethod
+    def from_json_file(cls, filepath: str) -> "TranslationTrie":
+        """Load a TranslationTrie from a JSON file."""
+        with open(filepath, "r", encoding="utf-8") as f:
+            dictionary = json.load(f)
+        return cls(dictionary)
+
+    def to_json_file(self, filepath: str) -> None:
+        """Export the current TranslationTrie dictionary to a JSON file."""
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(self.dictionary, f, indent=2)
 
     def _get_mode_tree(self, mode: str) -> Dict[str, Any]:
         """Fetch the specific sub-tree for the current operational mode."""
