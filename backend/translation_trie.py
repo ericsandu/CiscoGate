@@ -1,4 +1,5 @@
 import json
+import re
 from typing import List, Tuple, Dict, Any
 
 
@@ -131,3 +132,70 @@ class TranslationTrie:
             new_mode = "exec"
 
         return translated_cmd, new_mode
+
+    def add_translation(
+        self,
+        mode: str,
+        path: List[str],
+        translate_str: str,
+        metadata: Dict[str, Any] = None,
+    ) -> None:
+        """
+        Dynamically adds a new translation path to the trie in memory.
+        """
+        if mode not in self.dictionary["modes"]:
+            self.dictionary["modes"][mode] = {}
+
+        current = self.dictionary["modes"][mode]
+        for token in path:
+            if token not in current:
+                current[token] = {}
+            current = current[token]
+
+        current["_translate"] = translate_str
+        if metadata:
+            for k, v in metadata.items():
+                current[k] = v
+
+    def add_and_sync_translation(
+        self,
+        reverse_trie: "TranslationTrie",
+        mode: str,
+        path: List[str],
+        translate_str: str,
+        metadata: Dict[str, Any] = None,
+    ) -> None:
+        """
+        Adds a translation to this trie, algorithmically reverses it,
+        and injects the reverse mapping into the provided reverse_trie.
+        """
+        # 1. Add to self
+        self.add_translation(mode, path, translate_str, metadata)
+
+        # 2. Reverse the path logic
+        rev_path_tokens = translate_str.strip().split()
+        reverse_path = []
+        for token in rev_path_tokens:
+            # Replace format placeholders like {0}, {1} with <VAR>
+            if re.match(r"^\{\d+\}$", token):
+                reverse_path.append("<VAR>")
+            else:
+                reverse_path.append(token)
+
+        # 3. Build the reverse translation string from the original path
+        rev_translate_tokens = []
+        var_index = 0
+        for token in path:
+            if token == "<VAR>":
+                rev_translate_tokens.append(f"{{{var_index}}}")
+                var_index += 1
+            else:
+                rev_translate_tokens.append(token)
+
+        reverse_translate_str = " ".join(rev_translate_tokens)
+
+        # 4. Add the inverted path to the reverse trie
+        # (Pass metadata as-is, though complex state changes may require specific handling)
+        reverse_trie.add_translation(
+            mode, reverse_path, reverse_translate_str, metadata
+        )
