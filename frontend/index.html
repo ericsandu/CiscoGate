@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ro">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="CiscoGate - consolă web pentru comenzi Cisco IOS și FortiOS"
+    />
+    <title>CiscoGate Console</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <div class="brand-mark" aria-hidden="true">CG</div>
+          <div>
+            <h1>CiscoGate</h1>
+            <p>Unified Network Console</p>
+          </div>
+        </div>
+        <div class="status-wrap" aria-live="polite">
+          <span id="status-dot" class="status-dot status-idle"></span>
+          <span id="connection-status">Deconectat</span>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="panel connection-panel">
+          <div class="panel-heading">
+            <span class="eyebrow">SESIUNE NOUĂ</span>
+            <h2>Conectare echipament</h2>
+          </div>
+
+          <form id="connection-form" autocomplete="off">
+            <div class="field-grid two-columns">
+              <label class="field">
+                <span>Sintaxă preferată</span>
+                <select id="syntax" name="syntax">
+                  <option value="cisco_ios">Cisco IOS</option>
+                  <option value="fortios">FortiOS</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Rol echipament</span>
+                <select id="role" name="role">
+                  <option value="firewall">Firewall</option>
+                  <option value="router">Router</option>
+                  <option value="switch">Switch</option>
+                </select>
+              </label>
+            </div>
+
+            <label class="field">
+              <span>IP / Host</span>
+              <input id="target" name="target" type="text" placeholder="192.168.1.1" required />
+            </label>
+
+            <div class="field-grid port-row">
+              <label class="field grow">
+                <span>Utilizator</span>
+                <input id="username" name="username" type="text" placeholder="admin" required />
+              </label>
+              <label class="field port-field">
+                <span>Port SSH</span>
+                <input id="port" name="port" type="number" min="1" max="65535" value="22" required />
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Parolă</span>
+              <input id="password" name="password" type="password" placeholder="••••••••" required />
+            </label>
+
+            <label class="field">
+              <span>Proxy ID <small>opțional pentru Direct Connect</small></span>
+              <input id="proxy-id" name="proxyId" type="text" placeholder="UUID de la local_proxy.py" />
+            </label>
+
+            <button id="connect-button" class="primary-button" type="submit">
+              <span>Conectează</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          </form>
+
+          <div class="session-meta">
+            <div>
+              <span>Mod CLI</span>
+              <strong id="mode-value">exec</strong>
+            </div>
+            <div>
+              <span>Session ID</span>
+              <strong id="session-value">—</strong>
+            </div>
+          </div>
+        </aside>
+
+        <section class="terminal-section" aria-label="Consolă CiscoGate">
+          <div class="terminal-toolbar">
+            <div class="window-controls" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="terminal-title">network-console</div>
+            <div class="terminal-actions">
+              <button id="clear-button" type="button">Clear</button>
+              <button id="disconnect-button" type="button" disabled>Disconnect</button>
+            </div>
+          </div>
+          <div id="terminal-container" aria-label="Terminal interactiv"></div>
+          <div class="terminal-footer">
+            <span><kbd>?</kbd> sugestii</span>
+            <span><kbd>Tab</kbd> completare</span>
+            <span><kbd>↑</kbd>/<kbd>↓</kbd> istoric</span>
+            <span class="secure-note">AES-GCM payload</span>
+          </div>
+        </section>
+      </main>
+
+      <div
+        id="variable-modal"
+        class="modal-backdrop hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+      >
+        <div class="modal-card">
+          <span class="eyebrow">COMANDĂ NECUNOSCUTĂ</span>
+          <h2 id="modal-title">Marchează valorile variabile</h2>
+          <p>
+            Selectează valorile care trebuie înlocuite cu <code>&lt;VAR&gt;</code> înainte de trimiterea șablonului către backend.
+          </p>
+          <div id="token-list" class="token-list"></div>
+          <div class="modal-actions">
+            <button id="cancel-variable-button" class="secondary-button" type="button">Anulează</button>
+            <button id="send-variable-button" class="primary-button compact" type="button">Trimite șablonul</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
