@@ -4,9 +4,16 @@ import os
 from openai import OpenAI
 from translation_trie import TranslationTrie
 
-# Initialize OpenAI Client using environment variable placeholder
-# Expects OPENAI_API_KEY to be set in the environment before running the server.
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "YOUR_API_KEY_HERE"))
+# Initialize OpenAI Client (Supports official OpenAI OR drop-in proxies like LocalAI/vLLM)
+client = OpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY", "YOUR_API_KEY_HERE"),
+    base_url=os.environ.get(
+        "OPENAI_BASE_URL"
+    ),  # Defaults to None (uses api.openai.com)
+)
+
+# Allow users to override the model name for LocalAI / custom models
+MODEL_NAME = os.environ.get("LLM_MODEL", "gpt-4o")
 
 
 def translate_and_learn_command(
@@ -50,9 +57,9 @@ def translate_and_learn_command(
     Return ONLY valid JSON.
     """
 
-    # Query OpenAI (gpt-4o) with forced JSON output
+    # Query the LLM with forced JSON output
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model=MODEL_NAME,
         response_format={"type": "json_object"},
         messages=[
             {
