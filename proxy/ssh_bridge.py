@@ -7,7 +7,6 @@ from netmiko import ConnectHandler
 
 
 class SSHBridge:
-
     def __init__(self, target, port, user, password, proxy_id, websocket=None):
         self.device = {
             "device_type": "autodetect",
