@@ -4,6 +4,11 @@ from typing import Dict, Optional
 
 from fastapi import WebSocket
 
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "proxy")))
+from ssh_bridge import SSHBridge
+
 from llm_client import translate_and_learn_command
 from translation_trie import TranslationTrie
 
@@ -38,6 +43,7 @@ class ClientSession:
         self.current_mode = "exec"
         self.proxy_id: Optional[str] = None
         self.device_os: Optional[str] = None
+        self.direct_bridge = None
 
         # Guardrail: Limit LLM fallback to 5 requests per minute
         self.llm_rate_limiter = TokenBucket(rate=5.0 / 60.0, capacity=5.0)
@@ -92,6 +98,51 @@ class ConnectionManager:
 
         action = message.get("action")
 
+        # ---------------------------------------------------------
+        # CONNECTION HANDLING
+        # ---------------------------------------------------------
+        if action == "connect":
+            proxy_id = message.get("proxy_id")
+            if proxy_id:
+                session.proxy_id = proxy_id
+                await self.send_to_frontend(
+                    session_id,
+                    {"action": "stream_output", "data": f"\n[System] Waiting for Proxy {proxy_id} to connect...\n"},
+                )
+            else:
+                target = message.get("target")
+                port = int(message.get("port", 22))
+                user = message.get("user")
+                password = message.get("password")
+
+                await self.send_to_frontend(
+                    session_id,
+                    {"action": "stream_output", "data": f"\n[System] Direct Connect to {target}:{port}...\n"},
+                )
+
+                try:
+                    bridge = SSHBridge(
+                        target=target,
+                        port=port,
+                        user=user,
+                        password=password,
+                        proxy_id=session_id,  # Use session_id as the AES key seed
+                        websocket=session.ws,
+                    )
+                    device_os = await asyncio.to_thread(bridge.connect)
+                    session.device_os = device_os
+                    session.direct_bridge = bridge
+
+                    await self.send_to_frontend(
+                        session_id,
+                        {"action": "stream_output", "data": f"\n[System] Successfully connected! Detected OS: {device_os}\n"},
+                    )
+                except Exception as e:
+                    await self.send_to_frontend(
+                        session_id, {"action": "stream_output", "data": f"\n[System] Direct Connect Failed: {str(e)}\n"}
+                    )
+            return
+
         # ZKT Architecture: The frontend sends a sanitized template and encrypted variables
         template = message.get("template", "")
         e2e_vars = message.get("e2e_vars", None)
@@ -145,6 +196,22 @@ class ConnectionManager:
                         "e2e_vars": e2e_vars,
                     },
                 )
+            elif session.direct_bridge:
+                try:
+                    final_command = session.direct_bridge.reconstruct_command(
+                        translated_template, e2e_vars
+                    )
+                    output = await asyncio.to_thread(
+                        session.direct_bridge.net_connect.send_command, final_command,
+                        expect_string=r"#"  # Netmiko needs to wait for prompt
+                    )
+                    await self.send_to_frontend(
+                        session_id, {"action": "stream_output", "data": f"\n{output}\n"}
+                    )
+                except Exception as e:
+                    await self.send_to_frontend(
+                        session_id, {"action": "stream_output", "data": f"\nError: {str(e)}\n"}
+                    )
             else:
                 await self.send_to_frontend(
                     session_id,
@@ -218,6 +285,17 @@ class ConnectionManager:
                             "template": translated_template,
                             "e2e_vars": e2e_vars,
                         },
+                    )
+                elif session.direct_bridge:
+                    final_command = session.direct_bridge.reconstruct_command(
+                        translated_template, e2e_vars
+                    )
+                    output = await asyncio.to_thread(
+                        session.direct_bridge.net_connect.send_command, final_command,
+                        expect_string=r"#"
+                    )
+                    await self.send_to_frontend(
+                        session_id, {"action": "stream_output", "data": f"\n{output}\n"}
                     )
             except Exception as e:
                 await self.send_to_frontend(
