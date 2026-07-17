@@ -83,13 +83,14 @@ async def websocket_frontend(
 # The Proxy Engineer will build `proxy/local_proxy.py` and `proxy/ssh_bridge.py`.
 # The local_proxy will use `netmiko` to connect to the target hardware,
 # autodetect the `device_os`, and generate a secure `proxy_id`.
-# 
+#
 # It will then dial out and establish a reverse tunnel to the endpoint below:
 # ws://<backend_url>/ws/proxy/{proxy_id}?device_os={device_os}
 #
 # Once connected, it listens for {"action": "execute", "command": "..."} JSON payloads,
 # executes them via Netmiko, and streams the raw terminal output back up the tunnel.
 # ====================================================================
+
 
 @app.websocket("/ws/proxy/{proxy_id}")
 async def websocket_proxy(websocket: WebSocket, proxy_id: str, device_os: str):

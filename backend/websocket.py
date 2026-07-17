@@ -91,7 +91,10 @@ class ConnectionManager:
             return
 
         action = message.get("action")
-        command = message.get("command", "")
+
+        # ZKT Architecture: The frontend sends a sanitized template and encrypted variables
+        template = message.get("template", "")
+        e2e_vars = message.get("e2e_vars", None)
 
         # ---------------------------------------------------------
         # COMMAND EXECUTION ROUTING
@@ -100,7 +103,7 @@ class ConnectionManager:
             # 1. Determine Bidirectional Mode
             if session.preferred_syntax == session.device_os:
                 # Passthrough Mode (No translation needed)
-                translated_cmd = command
+                translated_template = template
             else:
                 # Translation Mode
                 forward_trie = (
@@ -110,8 +113,10 @@ class ConnectionManager:
                 )
 
                 try:
-                    translated_cmd, new_mode = forward_trie.translate_command(
-                        command, session.current_mode, session.role
+                    # The existing Trie logic perfectly supports generic templates natively!
+                    # Passing `ip address <VAR>` will output `set ip <VAR>`
+                    translated_template, new_mode = forward_trie.translate_command(
+                        template, session.current_mode, session.role
                     )
                     session.current_mode = new_mode
                 except Exception as e:
@@ -129,7 +134,12 @@ class ConnectionManager:
             # Note: For Direct Connect, this logic would branch to the imported SSHBridge module instead.
             if session.proxy_id and session.proxy_id in self.active_proxies:
                 await self.send_to_proxy(
-                    session.proxy_id, {"action": "execute", "command": translated_cmd}
+                    session.proxy_id,
+                    {
+                        "action": "execute",
+                        "template": translated_template,
+                        "e2e_vars": e2e_vars,
+                    },
                 )
             else:
                 await self.send_to_frontend(
@@ -176,9 +186,9 @@ class ConnectionManager:
             try:
                 # Offload the blocking LLM network call to a separate thread
                 # so we don't freeze the async WebSocket event loop.
-                translated_cmd = await asyncio.to_thread(
+                translated_template = await asyncio.to_thread(
                     translate_and_learn_command,
-                    command,
+                    template,
                     session.preferred_syntax,
                     target_os,
                     session.role,
@@ -195,11 +205,15 @@ class ConnectionManager:
                     f"data/{target_os}_to_{session.preferred_syntax}.json"
                 )
 
-                # Forward the freshly learned command to the proxy
+                # Forward the freshly learned template to the proxy
                 if session.proxy_id and session.proxy_id in self.active_proxies:
                     await self.send_to_proxy(
                         session.proxy_id,
-                        {"action": "execute", "command": translated_cmd},
+                        {
+                            "action": "execute",
+                            "template": translated_template,
+                            "e2e_vars": e2e_vars,
+                        },
                     )
             except Exception as e:
                 await self.send_to_frontend(

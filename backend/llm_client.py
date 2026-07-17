@@ -25,19 +25,22 @@ def translate_and_learn_command(
 
     prompt = f"""
     You are an expert network engineer. 
-    Translate the following {source_os} command to {target_os}. 
+    Translate the following {source_os} command template to {target_os}. 
     The device role is {role} and the current operational mode is '{current_mode}'. 
     
-    Command to translate: '{command}'
+    Command Template to translate: '{command}'
     
-    Identify any dynamic variables (like IP addresses, subnet masks, interface names) and output the mapping in the following exact JSON schema:
+    Note: The command has already been sanitized for Zero-Knowledge Translation. 
+    Sensitive variables like IP addresses, interfaces, or names have been replaced with the exact string '<VAR>'.
+    
+    Identify the mapping and output the following exact JSON schema:
     {{
-        "source_path": ["list", "of", "original", "command", "words", "replacing", "variables", "with", "<VAR>"],
-        "target_translate_str": "The translated string with variables replaced by {{0}}, {{1}} format placeholders.",
+        "source_path": ["list", "of", "original", "template", "words", "preserving", "the", "exact", "<VAR>", "tokens"],
+        "target_translate_str": "The translated template with variables replaced by {{0}}, {{1}} format placeholders.",
         "new_mode": "Optional: the new operational mode if this command changes it, otherwise omit."
     }}
     
-    Example input (Cisco to Fortinet): 'ip address 192.168.1.1 255.255.255.0'
+    Example input (Cisco to Fortinet): 'ip address <VAR> <VAR>'
     Example JSON output:
     {{
         "source_path": ["ip", "address", "<VAR>", "<VAR>"],
