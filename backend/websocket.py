@@ -101,9 +101,13 @@ class ConnectionManager:
         # ---------------------------------------------------------
         if action == "execute_command":
             # 1. Determine Bidirectional Mode
-            if session.preferred_syntax == session.device_os:
-                # Passthrough Mode (No translation needed)
-                translated_template = template
+            if (
+                template == "PASSTHROUGH"
+                or session.preferred_syntax == session.device_os
+            ):
+                # True Passthrough Mode: No translation needed.
+                # The entire raw command is securely encrypted inside `e2e_vars`.
+                translated_template = "PASSTHROUGH"
             else:
                 # Translation Mode
                 forward_trie = (

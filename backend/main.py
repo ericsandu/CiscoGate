@@ -2,6 +2,7 @@ import json
 import os
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
 
 from translation_trie import TranslationTrie
 from websocket import manager
@@ -42,6 +43,27 @@ fortios_to_cisco = init_trie("fortios_to_cisco_ios.json")
 # async def serve_frontend():
 #     return FileResponse("../frontend/index.html")
 # ====================================================================
+
+
+@app.get("/api/syntax-tree")
+async def get_syntax_tree(syntax: str):
+    """
+    Serves the translation dictionary so the frontend can perform
+    0-latency auto-complete and deterministic Client-Side ZKT parsing.
+    """
+    try:
+        target = "fortios" if syntax == "cisco_ios" else "cisco_ios"
+        path = f"data/{syntax}_to_{target}.json"
+        if not os.path.exists(path):
+            return JSONResponse(
+                content={
+                    "modes": {"exec": {}, "global_config": {}, "interface_config": {}}
+                }
+            )
+        with open(path, "r", encoding="utf-8") as f:
+            return JSONResponse(content=json.load(f))
+    except Exception:
+        return JSONResponse(content={"modes": {}})
 
 
 # ====================================================================
