@@ -76,6 +76,14 @@ class SSHBridge:
 
         if template == "PASSTHROUGH" or not template:
             # În PASSTHROUGH, datele decriptate reprezintă comanda întreagă
+            # Frontendul le criptează prin JSON.stringify, așa că trebuie să folosim json.loads
+            # pentru a scoate ghilimelele literale (ex: '"show ip route"' -> 'show ip route').
+            try:
+                parsed = json.loads(decrypted_string)
+                if isinstance(parsed, str):
+                    return parsed
+            except Exception:
+                pass
             return decrypted_string
 
         # Încercăm să parsăm array-ul de variabile JSON decriptate
