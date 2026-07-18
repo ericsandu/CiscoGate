@@ -20,10 +20,6 @@ const elements = {
   statusText: document.querySelector('#connection-status'),
   mode: document.querySelector('#mode-value'),
   session: document.querySelector('#session-value'),
-  modal: document.querySelector('#variable-modal'),
-  tokenList: document.querySelector('#token-list'),
-  cancelVariable: document.querySelector('#cancel-variable-button'),
-  sendVariable: document.querySelector('#send-variable-button'),
 };
 
 const fitAddon = new FitAddon();
@@ -400,7 +396,6 @@ function disconnect({ announce = true } = {}) {
 }
 
 terminal.onData(async (data) => {
-  if (!elements.modal.classList.contains('hidden')) return;
 
   if (data === '\r') {
     terminal.write('\r\n');
