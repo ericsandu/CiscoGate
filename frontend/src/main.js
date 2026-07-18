@@ -468,7 +468,7 @@ elements.form.addEventListener('submit', async (event) => {
       target: elements.target.value.trim(),
       port: Number(elements.port.value),
       user: elements.username.value,
-      pass: elements.password.value,
+      password: elements.password.value,
     }));
 
     terminal.clear();
