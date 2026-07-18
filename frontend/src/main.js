@@ -258,56 +258,7 @@ async function makeCommandPayload(template, variables, rawCommand = null) {
   };
 }
 
-function openVariableModal(command) {
-  state.pendingUnknownCommand = command;
-  elements.tokenList.replaceChildren();
 
-  command.trim().split(/\s+/).filter(Boolean).forEach((token, index) => {
-    const label = document.createElement('label');
-    label.className = 'token-chip';
-
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.value = String(index);
-
-    const text = document.createElement('span');
-    text.textContent = token;
-
-    label.append(checkbox, text);
-    elements.tokenList.append(label);
-  });
-
-  elements.modal.classList.remove('hidden');
-}
-
-function closeVariableModal() {
-  elements.modal.classList.add('hidden');
-  state.pendingUnknownCommand = null;
-  terminal.focus();
-}
-
-async function sendTemplatedUnknownCommand() {
-  if (!state.pendingUnknownCommand || !socketIsOpen()) return;
-
-  const tokens = state.pendingUnknownCommand.trim().split(/\s+/).filter(Boolean);
-  const selected = new Set(
-    [...elements.tokenList.querySelectorAll('input:checked')]
-      .map((input) => Number(input.value)),
-  );
-  const variables = [];
-  const templateTokens = tokens.map((token, index) => {
-    if (!selected.has(index)) return token;
-    variables.push(token);
-    return '<VAR>';
-  });
-
-  const payload = await makeCommandPayload(templateTokens.join(' '), variables);
-  state.pendingPayload = payload;
-  state.socket.send(JSON.stringify(payload));
-  elements.modal.classList.add('hidden');
-  state.pendingUnknownCommand = null;
-  terminal.focus();
-}
 
 async function submitCommand(command) {
   const trimmed = command.trim();
@@ -340,7 +291,9 @@ async function submitCommand(command) {
 
   const parsed = parseCommand(state.syntaxTree, state.currentMode, command);
   if (!parsed.matched) {
-    openVariableModal(command);
+    const payload = await makeCommandPayload(command, []);
+    state.pendingPayload = payload;
+    state.socket.send(JSON.stringify(payload));
     return;
   }
 
@@ -664,12 +617,6 @@ elements.clear.addEventListener('click', () => {
 });
 
 elements.disconnect.addEventListener('click', () => disconnect());
-elements.cancelVariable.addEventListener('click', () => {
-  closeVariableModal();
-  writeSystem('Comanda a fost anulată.', 'warning');
-  writePrompt();
-});
-elements.sendVariable.addEventListener('click', sendTemplatedUnknownCommand);
 window.addEventListener('resize', () => fitAddon.fit());
 
 await loadSyntaxTree();
