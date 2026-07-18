@@ -168,12 +168,7 @@ class ConnectionManager:
         # ---------------------------------------------------------
         if action == "execute_command":
             # 1. Determine Bidirectional Mode
-            if (
-                template == "PASSTHROUGH"
-                or session.preferred_syntax == session.device_os
-            ):
-                # True Passthrough Mode: No translation needed.
-                # The entire raw command is securely encrypted inside `e2e_vars`.
+            if template == "PASSTHROUGH":
                 translated_template = "PASSTHROUGH"
             else:
                 # Translation Mode
@@ -184,8 +179,6 @@ class ConnectionManager:
                 )
 
                 try:
-                    # The existing Trie logic perfectly supports generic templates natively!
-                    # Passing `ip address <VAR>` will output `set ip <VAR>`
                     translated_template, new_mode = forward_trie.translate_command(
                         template, session.current_mode, session.role
                     )
