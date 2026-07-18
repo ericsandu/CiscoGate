@@ -156,7 +156,7 @@ class ConnectionManager:
                         },
                     )
                     await session.ws.close()
-                    del self.active_sessions[session_id]
+                    del self.active_connections[session_id]
             return
 
         # ZKT Architecture: The frontend sends a sanitized template and encrypted variables
