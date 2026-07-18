@@ -133,7 +133,7 @@ class ConnectionManager:
                         port=port,
                         user=user,
                         password=password,
-                        proxy_id="direct-connect",  # Align AES seed key with frontend fallback
+                        proxy_id=session_id,  # Align AES seed key with frontend WebSocket UUID
                         websocket=session.ws,
                     )
                     device_os = await asyncio.to_thread(bridge.connect)
