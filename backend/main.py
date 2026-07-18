@@ -84,7 +84,7 @@ async def get_syntax_tree(syntax: str):
 
 @app.websocket("/ws/frontend/{session_id}")
 async def websocket_frontend(
-    websocket: WebSocket, session_id: str, syntax: str, role: str
+    websocket: WebSocket, session_id: str, syntax: str, role: str = "auto"
 ):
     """
     Endpoint for the Frontend Web UI to connect.

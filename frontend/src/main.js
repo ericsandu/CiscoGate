@@ -607,7 +607,6 @@ elements.form.addEventListener('submit', async (event) => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const query = new URLSearchParams({
     syntax: elements.syntax.value,
-    role: 'auto',
   });
 
   state.socket = new WebSocket(
