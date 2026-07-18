@@ -2,7 +2,8 @@ import json
 import os
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from translation_trie import TranslationTrie
 from websocket import manager
@@ -29,19 +30,29 @@ cisco_to_fortios = init_trie("cisco_ios_to_fortios.json")
 fortios_to_cisco = init_trie("fortios_to_cisco_ios.json")
 
 # ====================================================================
-# 1. FRONTEND WEBSITE INTEGRATION (TODO)
+# 1. FRONTEND WEBSITE INTEGRATION
 # ====================================================================
 # The Frontend Engineer will build the xterm.js UI in a /frontend folder.
 # We will mount it statically here so this FastAPI server hosts the web app directly.
-#
-# from fastapi.staticfiles import StaticFiles
-# from fastapi.responses import FileResponse
-#
-# app.mount("/static", StaticFiles(directory="../frontend"), name="static")
-#
-# @app.get("/")
-# async def serve_frontend():
-#     return FileResponse("../frontend/index.html")
+
+frontend_dir = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "frontend")
+)
+os.makedirs(frontend_dir, exist_ok=True)
+
+# Important: Mounting the src/ directory explicitly so the index.html can load /src/main.js
+src_dir = os.path.join(frontend_dir, "src")
+os.makedirs(src_dir, exist_ok=True)
+
+app.mount("/src", StaticFiles(directory=src_dir), name="src")
+app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
+
+
+@app.get("/")
+async def serve_frontend():
+    return FileResponse(os.path.join(frontend_dir, "index.html"))
+
+
 # ====================================================================
 
 
