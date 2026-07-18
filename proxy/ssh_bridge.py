@@ -55,14 +55,9 @@ class SSHBridge:
         if not encrypted_vars:
             return ""
         try:
-            # Derive key using PBKDF2 exactly as the frontend does
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=b"zkt-salt",
-                iterations=100000,
-            )
-            key = kdf.derive(self.proxy_id.encode("utf-8"))
+            # Hash proxy_id exact cum se intampla pe frontend
+            digest = hashlib.sha256(self.proxy_id.encode("utf-8")).digest()
+            key = digest
 
             if isinstance(encrypted_vars, str):
                 try:
