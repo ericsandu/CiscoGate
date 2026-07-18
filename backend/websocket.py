@@ -6,6 +6,7 @@ from fastapi import WebSocket
 
 import sys
 import os
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "proxy")))
 from ssh_bridge import SSHBridge
 
@@ -107,7 +108,10 @@ class ConnectionManager:
                 session.proxy_id = proxy_id
                 await self.send_to_frontend(
                     session_id,
-                    {"action": "stream_output", "data": f"\n[System] Waiting for Proxy {proxy_id} to connect...\n"},
+                    {
+                        "action": "stream_output",
+                        "data": f"\n[System] Waiting for Proxy {proxy_id} to connect...\n",
+                    },
                 )
             else:
                 target = message.get("target")
@@ -117,7 +121,10 @@ class ConnectionManager:
 
                 await self.send_to_frontend(
                     session_id,
-                    {"action": "stream_output", "data": f"\n[System] Direct Connect to {target}:{port}...\n"},
+                    {
+                        "action": "stream_output",
+                        "data": f"\n[System] Direct Connect to {target}:{port}...\n",
+                    },
                 )
 
                 try:
@@ -135,11 +142,18 @@ class ConnectionManager:
 
                     await self.send_to_frontend(
                         session_id,
-                        {"action": "stream_output", "data": f"\n[System] Successfully connected! Detected OS: {device_os}\n"},
+                        {
+                            "action": "stream_output",
+                            "data": f"\n[System] Successfully connected! Detected OS: {device_os}\n",
+                        },
                     )
                 except Exception as e:
                     await self.send_to_frontend(
-                        session_id, {"action": "stream_output", "data": f"\n[System] Direct Connect Failed: {str(e)}\n"}
+                        session_id,
+                        {
+                            "action": "stream_output",
+                            "data": f"\n[System] Direct Connect Failed: {str(e)}\n",
+                        },
                     )
             return
 
@@ -202,15 +216,17 @@ class ConnectionManager:
                         translated_template, e2e_vars
                     )
                     output = await asyncio.to_thread(
-                        session.direct_bridge.net_connect.send_command, final_command,
-                        expect_string=r"#"  # Netmiko needs to wait for prompt
+                        session.direct_bridge.net_connect.send_command,
+                        final_command,
+                        expect_string=r"#",  # Netmiko needs to wait for prompt
                     )
                     await self.send_to_frontend(
                         session_id, {"action": "stream_output", "data": f"\n{output}\n"}
                     )
                 except Exception as e:
                     await self.send_to_frontend(
-                        session_id, {"action": "stream_output", "data": f"\nError: {str(e)}\n"}
+                        session_id,
+                        {"action": "stream_output", "data": f"\nError: {str(e)}\n"},
                     )
             else:
                 await self.send_to_frontend(
@@ -291,8 +307,9 @@ class ConnectionManager:
                         translated_template, e2e_vars
                     )
                     output = await asyncio.to_thread(
-                        session.direct_bridge.net_connect.send_command, final_command,
-                        expect_string=r"#"
+                        session.direct_bridge.net_connect.send_command,
+                        final_command,
+                        expect_string=r"#",
                     )
                     await self.send_to_frontend(
                         session_id, {"action": "stream_output", "data": f"\n{output}\n"}
