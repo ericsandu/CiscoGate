@@ -3,7 +3,7 @@ import base64
 import hashlib
 import json
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from netmiko import ConnectHandler
+from netmiko import ConnectHandler, SSHDetect
 
 
 class SSHBridge:
@@ -22,8 +22,21 @@ class SSHBridge:
     def connect(self):
         """Stabilește conexiunea SSH cu echipamentul."""
         print(f"[SSHBridge] Connecting to switch at {self.device['host']}...")
+        
+        # Proper Netmiko autodetection workflow
+        guesser = SSHDetect(**self.device)
+        best_match = guesser.autodetect()
+        print(f"[SSHBridge] Netmiko autodetected best match: {best_match}")
+        
+        if best_match:
+            self.device["device_type"] = best_match
+        else:
+            # Fallback just in case
+            self.device["device_type"] = "cisco_ios"
+            best_match = "cisco_ios"
+            
         self.net_connect = ConnectHandler(**self.device)
-        detected_os = self.net_connect.device_type
+        detected_os = best_match
         
         # Normalize netmiko's specific OS types to our backend dictionary schemas
         detected_os_lower = detected_os.lower()
