@@ -33,13 +33,24 @@
           </div>
 
           <form id="connection-form" autocomplete="off">
-            <label class="field">
-              <span>Sintaxă preferată</span>
-              <select id="syntax" name="syntax">
-                <option value="cisco_ios">Cisco IOS</option>
-                <option value="fortios">FortiOS</option>
-              </select>
-            </label>
+            <div class="field-grid two-columns">
+              <label class="field">
+                <span>Sintaxă preferată</span>
+                <select id="syntax" name="syntax">
+                  <option value="cisco_ios">Cisco IOS</option>
+                  <option value="fortios">FortiOS</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Rol echipament</span>
+                <select id="role" name="role">
+                  <option value="firewall">Firewall</option>
+                  <option value="router">Router</option>
+                  <option value="switch">Switch</option>
+                </select>
+              </label>
+            </div>
 
             <label class="field">
               <span>IP / Host</span>
