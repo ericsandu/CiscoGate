@@ -155,6 +155,8 @@ class ConnectionManager:
                             "data": f"\n[System] Direct Connect Failed: {str(e)}\n",
                         },
                     )
+                    await session.ws.close()
+                    del self.active_sessions[session_id]
             return
 
         # ZKT Architecture: The frontend sends a sanitized template and encrypted variables
