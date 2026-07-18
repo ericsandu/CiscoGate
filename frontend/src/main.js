@@ -333,7 +333,13 @@ function handleBackendMessage(event) {
   }
 
   if (message.action === 'stream_chunk' || message.action === 'stream_output') {
-    const output = String(message.data ?? '').replace(/^(?:[ \t]*\r?\n)+/, '');
+    let output = String(message.data ?? '');
+    
+    // Only strip leading newlines for the legacy stream_output, not for chunks
+    if (message.action === 'stream_output') {
+      output = output.replace(/^(?:[ \t]*\r?\n)+/, '');
+    }
+    
     detectDeviceOsFromLegacyMessage(output);
     terminal.write(normalizeOutput(output));
     
