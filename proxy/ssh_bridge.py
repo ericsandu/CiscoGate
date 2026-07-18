@@ -132,18 +132,45 @@ class SSHBridge:
 
                     print(f"[SSHBridge] Executing command: {final_command}")
 
-                    # Executăm pe router/switch
-                    output = await asyncio.to_thread(
-                        self.net_connect.send_command, final_command
-                    )
-
-                    # Trimitem output-ul înapoi
-                    response_payload = {
-                        "action": "stream_output",
-                        "data": f"\n{output}\n",
-                    }
-
-                    await self.websocket.send(json.dumps(response_payload))
+                    # Executăm pe router/switch cu streaming real-time
+                    self.net_connect.write_channel(final_command + "\n")
+                    
+                    import time
+                    start_time = time.time()
+                    output_buffer = ""
+                    
+                    while True:
+                        if time.time() - start_time > 120:
+                            # Timeout de siguranță de 2 minute
+                            break
+                            
+                        chunk = self.net_connect.read_channel()
+                        if chunk:
+                            output_buffer += chunk
+                            # Stream back to frontend immediately
+                            await self.websocket.send(json.dumps({
+                                "action": "stream_chunk",
+                                "data": chunk
+                            }))
+                            
+                        # Verificăm dacă am primit prompt-ul de final
+                        stripped_buffer = output_buffer.strip()
+                        if stripped_buffer:
+                            lines = stripped_buffer.split("\n")
+                            last_line = lines[-1].strip()
+                            
+                            # Prompt-ul se termină mereu cu > sau #
+                            # și conține hostname-ul (base_prompt)
+                            if (last_line.endswith(">") or last_line.endswith("#")) and \
+                               self.net_connect.base_prompt in last_line:
+                                break
+                                
+                        await asyncio.sleep(0.1)
+                        
+                    # Notificăm frontend-ul că stream-ul s-a încheiat
+                    await self.websocket.send(json.dumps({
+                        "action": "stream_end"
+                    }))
 
         except Exception as e:
             print(f"[SSHBridge] Error in bridging loop: {e}")

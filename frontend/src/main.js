@@ -332,7 +332,7 @@ function handleBackendMessage(event) {
     return;
   }
 
-  if (message.action === 'stream_output') {
+  if (message.action === 'stream_chunk' || message.action === 'stream_output') {
     const output = String(message.data ?? '').replace(/^(?:[ \t]*\r?\n)+/, '');
     detectDeviceOsFromLegacyMessage(output);
     terminal.write(normalizeOutput(output));
@@ -344,9 +344,17 @@ function handleBackendMessage(event) {
       state.isPasswordPrompt = true;
     } else {
       state.isPasswordPrompt = false;
-      if (!/\r?\n$/.test(output)) terminal.write('\r\n');
-      writePrompt();
+      if (message.action === 'stream_output') {
+        if (!/\r?\n$/.test(output)) terminal.write('\r\n');
+        writePrompt();
+      }
     }
+    return;
+  }
+
+  if (message.action === 'stream_end') {
+    terminal.write('\x1b[2K\r');
+    writePrompt();
     return;
   }
 
