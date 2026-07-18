@@ -128,12 +128,12 @@ class ConnectionManager:
                 )
 
                 try:
-                    bridge = SSHBridge(
+                    session.direct_bridge = bridge = SSHBridge(
                         target=target,
                         port=port,
                         user=user,
                         password=password,
-                        proxy_id=session_id,  # Use session_id as the AES key seed
+                        proxy_id="direct-connect",  # Align AES seed key with frontend fallback
                         websocket=session.ws,
                     )
                     device_os = await asyncio.to_thread(bridge.connect)
