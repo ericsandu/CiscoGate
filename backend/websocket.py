@@ -168,31 +168,33 @@ class ConnectionManager:
         # ---------------------------------------------------------
         if action == "execute_command":
             # 1. Determine Bidirectional Mode
-            if template == "PASSTHROUGH":
-                translated_template = "PASSTHROUGH"
             else:
-                # Translation Mode
-                forward_trie = (
-                    cisco_trie
-                    if session.preferred_syntax == "cisco_ios"
-                    else forti_trie
-                )
+                # Backend translation logic
+                if session.preferred_syntax == session.device_os:
+                    # They natively match, no translation needed. Just reconstruct the frontend template directly!
+                    translated_template = template
+                else:
+                    forward_trie = (
+                        cisco_trie
+                        if session.preferred_syntax == "cisco_ios"
+                        else forti_trie
+                    )
 
-                try:
-                    translated_template, new_mode = forward_trie.translate_command(
-                        template, session.current_mode, session.role
-                    )
-                    session.current_mode = new_mode
-                except Exception as e:
-                    # Zero-Cost Guardrail: Command not in dictionary. Prompt user for LLM.
-                    await self.send_to_frontend(
-                        session_id,
-                        {
-                            "action": "cli_prompt",
-                            "data": f"Command not found. Error: {str(e)}\n[1] Query AI Engine  [2] Cancel",
-                        },
-                    )
-                    return
+                    try:
+                        translated_template, new_mode = forward_trie.translate_command(
+                            template, session.current_mode, session.role
+                        )
+                        session.current_mode = new_mode
+                    except Exception as e:
+                        # Zero-Cost Guardrail: Command not in dictionary. Prompt user for LLM.
+                        await self.send_to_frontend(
+                            session_id,
+                            {
+                                "action": "cli_prompt",
+                                "data": f"Command not found. Error: {str(e)}\n[1] Query AI Engine  [2] Cancel",
+                            },
+                        )
+                        return
 
             # 2. Route to Proxy (Tier 3)
             # Note: For Direct Connect, this logic would branch to the imported SSHBridge module instead.
