@@ -216,9 +216,8 @@ class ConnectionManager:
                         translated_template, e2e_vars
                     )
                     output = await asyncio.to_thread(
-                        session.direct_bridge.net_connect.send_command,
+                        session.direct_bridge.net_connect.send_command_timing,
                         final_command,
-                        expect_string=r"#",  # Netmiko needs to wait for prompt
                     )
                     await self.send_to_frontend(
                         session_id, {"action": "stream_output", "data": f"\n{output}\n"}
@@ -307,9 +306,8 @@ class ConnectionManager:
                         translated_template, e2e_vars
                     )
                     output = await asyncio.to_thread(
-                        session.direct_bridge.net_connect.send_command,
+                        session.direct_bridge.net_connect.send_command_timing,
                         final_command,
-                        expect_string=r"#",
                     )
                     await self.send_to_frontend(
                         session_id, {"action": "stream_output", "data": f"\n{output}\n"}
