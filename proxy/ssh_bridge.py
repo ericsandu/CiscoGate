@@ -3,6 +3,8 @@ import base64
 import hashlib
 import json
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
 from netmiko import ConnectHandler, SSHDetect
 
 
@@ -49,24 +51,41 @@ class SSHBridge:
         return detected_os
 
     def decrypt_vars(self, encrypted_vars):
-        """Decriptează e2e_vars folosind AES-GCM și cheia derivată din SHA256(proxy_id)."""
+        """Decriptează e2e_vars folosind AES-GCM și cheia derivată din PBKDF2."""
         if not encrypted_vars:
             return ""
         try:
-            # Derivăm cheia SHA-256 de 32 bytes din proxy_id
-            key = hashlib.sha256(self.proxy_id.encode()).digest()
+            # Derive key using PBKDF2 exactly as the frontend does
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=b"zkt-salt",
+                iterations=100000,
+            )
+            key = kdf.derive(self.proxy_id.encode("utf-8"))
 
-            # Decodificăm din Base64
-            raw_data = base64.b64decode(encrypted_vars)
+            if isinstance(encrypted_vars, str):
+                try:
+                    encrypted_vars = json.loads(encrypted_vars)
+                except Exception:
+                    pass
 
-            # Primii 12 bytes reprezintă Initialization Vector (IV), iar restul e ciphertext-ul
-            iv, ciphertext = raw_data[:12], raw_data[12:]
+            if isinstance(encrypted_vars, dict) and "iv" in encrypted_vars:
+                iv = base64.b64decode(encrypted_vars["iv"])
+                ciphertext = base64.b64decode(encrypted_vars["ciphertext"])
+            else:
+                # Decodificăm din Base64 (legacy format)
+                raw_data = base64.b64decode(encrypted_vars)
+                # Primii 12 bytes reprezintă Initialization Vector (IV), iar restul e ciphertext-ul
+                iv, ciphertext = raw_data[:12], raw_data[12:]
 
             # Decriptăm
             decrypted_bytes = AESGCM(key).decrypt(iv, ciphertext, None)
             return decrypted_bytes.decode("utf-8")
         except Exception as e:
             print(f"[SSHBridge] Decryption error / fallback: {e}")
+            print(f"[SSHBridge] DEBUG encrypted_vars type: {type(encrypted_vars)}")
+            print(f"[SSHBridge] DEBUG encrypted_vars: {encrypted_vars}")
             # Fallback în caz că în dev/testing variabilele vin ca text simplu necriptat
             return str(encrypted_vars)
 
