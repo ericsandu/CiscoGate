@@ -168,12 +168,12 @@ class ConnectionManager:
         # ---------------------------------------------------------
         if action == "execute_command":
             # 1. Determine Bidirectional Mode
+            if template == "PASSTHROUGH":
+                translated_template = "PASSTHROUGH"
+            elif session.preferred_syntax == session.device_os:
+                # They natively match, no translation needed. Just reconstruct the frontend template directly!
+                translated_template = template
             else:
-                # Backend translation logic
-                if session.preferred_syntax == session.device_os:
-                    # They natively match, no translation needed. Just reconstruct the frontend template directly!
-                    translated_template = template
-                else:
                     forward_trie = (
                         cisco_trie
                         if session.preferred_syntax == "cisco_ios"
