@@ -13,7 +13,7 @@ function bytesToBase64(bytes) {
 async function deriveKey(sharedSecret) {
   const digest = await crypto.subtle.digest(
     'SHA-256',
-    encoder.encode(`CiscoGate:${sharedSecret}`),
+    encoder.encode(sharedSecret),
   );
 
   return crypto.subtle.importKey(
