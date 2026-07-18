@@ -52,6 +52,41 @@ terminal.loadAddon(fitAddon);
 terminal.open(document.querySelector('#terminal-container'));
 fitAddon.fit();
 
+terminal.attachCustomKeyEventHandler((event) => {
+  const isClipboardShortcut = (
+    event.type === 'keydown'
+    && event.ctrlKey
+    && !event.altKey
+  );
+
+  if (!isClipboardShortcut) return true;
+
+  const key = event.key.toLowerCase();
+  if (key === 'c' && terminal.hasSelection()) {
+    event.preventDefault();
+    navigator.clipboard.writeText(terminal.getSelection()).catch(() => {
+      writeSystem('Textul selectat nu a putut fi copiat.', 'warning');
+    });
+    return false;
+  }
+
+  if (key === 'v') {
+    event.preventDefault();
+    navigator.clipboard.readText()
+      .then((text) => {
+        const pastedText = text.replace(/\r?\n/g, ' ');
+        state.currentLine += pastedText;
+        terminal.write(pastedText);
+      })
+      .catch(() => {
+        writeSystem('Textul din clipboard nu a putut fi inserat.', 'warning');
+      });
+    return false;
+  }
+
+  return true;
+});
+
 const state = {
   socket: null,
   syntaxTree: { modes: {} },
