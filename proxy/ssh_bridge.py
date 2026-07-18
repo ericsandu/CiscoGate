@@ -3,7 +3,9 @@ import base64
 import hashlib
 import json
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from netmiko import ConnectHandler
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+from netmiko import ConnectHandler, SSHDetect
 
 
 class SSHBridge:
@@ -22,30 +24,63 @@ class SSHBridge:
     def connect(self):
         """Stabilește conexiunea SSH cu echipamentul."""
         print(f"[SSHBridge] Connecting to switch at {self.device['host']}...")
+        
+        # Proper Netmiko autodetection workflow
+        guesser = SSHDetect(**self.device)
+        best_match = guesser.autodetect()
+        print(f"[SSHBridge] Netmiko autodetected best match: {best_match}")
+        
+        if best_match:
+            self.device["device_type"] = best_match
+        else:
+            # Fallback just in case
+            self.device["device_type"] = "cisco_ios"
+            best_match = "cisco_ios"
+            
         self.net_connect = ConnectHandler(**self.device)
-        detected_os = self.net_connect.device_type
+        detected_os = best_match
+        
+        # Normalize netmiko's specific OS types to our backend dictionary schemas
+        detected_os_lower = detected_os.lower()
+        if "cisco" in detected_os_lower:
+            detected_os = "cisco_ios"
+        elif "forti" in detected_os_lower:
+            detected_os = "fortios"
+            
         print(f"[SSHBridge] Successfully connected! Detected OS: {detected_os}")
         return detected_os
 
     def decrypt_vars(self, encrypted_vars):
-        """Decriptează e2e_vars folosind AES-GCM și cheia derivată din SHA256(proxy_id)."""
+        """Decriptează e2e_vars folosind AES-GCM și cheia derivată din PBKDF2."""
         if not encrypted_vars:
             return ""
         try:
-            # Derivăm cheia SHA-256 de 32 bytes din proxy_id
-            key = hashlib.sha256(self.proxy_id.encode()).digest()
+            # Hash proxy_id exact cum se intampla pe frontend
+            digest = hashlib.sha256(self.proxy_id.encode("utf-8")).digest()
+            key = digest
 
-            # Decodificăm din Base64
-            raw_data = base64.b64decode(encrypted_vars)
+            if isinstance(encrypted_vars, str):
+                try:
+                    encrypted_vars = json.loads(encrypted_vars)
+                except Exception:
+                    pass
 
-            # Primii 12 bytes reprezintă Initialization Vector (IV), iar restul e ciphertext-ul
-            iv, ciphertext = raw_data[:12], raw_data[12:]
+            if isinstance(encrypted_vars, dict) and "iv" in encrypted_vars:
+                iv = base64.b64decode(encrypted_vars["iv"])
+                ciphertext = base64.b64decode(encrypted_vars["ciphertext"])
+            else:
+                # Decodificăm din Base64 (legacy format)
+                raw_data = base64.b64decode(encrypted_vars)
+                # Primii 12 bytes reprezintă Initialization Vector (IV), iar restul e ciphertext-ul
+                iv, ciphertext = raw_data[:12], raw_data[12:]
 
             # Decriptăm
             decrypted_bytes = AESGCM(key).decrypt(iv, ciphertext, None)
             return decrypted_bytes.decode("utf-8")
         except Exception as e:
             print(f"[SSHBridge] Decryption error / fallback: {e}")
+            print(f"[SSHBridge] DEBUG encrypted_vars type: {type(encrypted_vars)}")
+            print(f"[SSHBridge] DEBUG encrypted_vars: {encrypted_vars}")
             # Fallback în caz că în dev/testing variabilele vin ca text simplu necriptat
             return str(encrypted_vars)
 
@@ -55,6 +90,14 @@ class SSHBridge:
 
         if template == "PASSTHROUGH" or not template:
             # În PASSTHROUGH, datele decriptate reprezintă comanda întreagă
+            # Frontendul le criptează prin JSON.stringify, așa că trebuie să folosim json.loads
+            # pentru a scoate ghilimelele literale (ex: '"show ip route"' -> 'show ip route').
+            try:
+                parsed = json.loads(decrypted_string)
+                if isinstance(parsed, str):
+                    return parsed
+            except Exception:
+                pass
             return decrypted_string
 
         # Încercăm să parsăm array-ul de variabile JSON decriptate

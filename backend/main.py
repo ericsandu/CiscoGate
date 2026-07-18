@@ -36,15 +36,15 @@ fortios_to_cisco = init_trie("fortios_to_cisco_ios.json")
 # We will mount it statically here so this FastAPI server hosts the web app directly.
 
 frontend_dir = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "frontend")
+    os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 )
 os.makedirs(frontend_dir, exist_ok=True)
 
-# Important: Mounting the src/ directory explicitly so the index.html can load /src/main.js
-src_dir = os.path.join(frontend_dir, "src")
-os.makedirs(src_dir, exist_ok=True)
-
-app.mount("/src", StaticFiles(directory=src_dir), name="src")
+# Vite outputs index.html and an assets/ folder in dist/
+assets_dir = os.path.join(frontend_dir, "assets")
+os.makedirs(assets_dir, exist_ok=True)
+app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+# Mount the root of dist for other static files (like favicon if any)
 app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 
 

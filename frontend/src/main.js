@@ -8,7 +8,6 @@ import './styles.css';
 const elements = {
   form: document.querySelector('#connection-form'),
   syntax: document.querySelector('#syntax'),
-  role: document.querySelector('#role'),
   target: document.querySelector('#target'),
   port: document.querySelector('#port'),
   username: document.querySelector('#username'),
@@ -53,10 +52,51 @@ terminal.loadAddon(fitAddon);
 terminal.open(document.querySelector('#terminal-container'));
 fitAddon.fit();
 
+terminal.attachCustomKeyEventHandler((event) => {
+  const isClipboardShortcut = (
+    event.type === 'keydown'
+    && event.ctrlKey
+    && !event.altKey
+  );
+
+  if (!isClipboardShortcut) return true;
+
+  const key = event.key.toLowerCase();
+  if (key === 'a' && event.shiftKey) {
+    event.preventDefault();
+    terminal.selectAll();
+    return false;
+  }
+
+  if (key === 'c' && terminal.hasSelection()) {
+    event.preventDefault();
+    navigator.clipboard.writeText(terminal.getSelection()).catch(() => {
+      writeSystem('Textul selectat nu a putut fi copiat.', 'warning');
+    });
+    return false;
+  }
+
+  if (key === 'v') {
+    event.preventDefault();
+    navigator.clipboard.readText()
+      .then((text) => {
+        const pastedText = text.replace(/\r?\n/g, ' ');
+        insertText(pastedText);
+      })
+      .catch(() => {
+        writeSystem('Textul din clipboard nu a putut fi inserat.', 'warning');
+      });
+    return false;
+  }
+
+  return true;
+});
+
 const state = {
   socket: null,
   syntaxTree: { modes: {} },
   currentLine: '',
+  cursorIndex: 0,
   currentMode: 'exec',
   history: [],
   historyIndex: 0,
@@ -83,8 +123,8 @@ function makeSessionId() {
 }
 
 function promptText() {
-  const roleNames = { firewall: 'Firewall', router: 'Router', switch: 'Switch' };
-  const name = roleNames[elements.role.value] || 'Device';
+  const deviceNames = { cisco_ios: 'Cisco', fortios: 'FortiGate' };
+  const name = deviceNames[state.deviceOs] || 'Device';
 
   if (elements.syntax.value === 'fortios') {
     if (state.currentMode === 'global_config') return `${name} (global) # `;
@@ -101,26 +141,53 @@ function writePrompt() {
   terminal.write(`\x1b[1;32m${promptText()}\x1b[0m`);
 }
 
-function writeSystem(message, type = 'info') {
+function writeSystem(message, type = 'info', leadingNewline = true) {
   const color = type === 'error'
     ? '\x1b[1;31m'
     : type === 'warning'
       ? '\x1b[1;33m'
       : '\x1b[1;36m';
-  terminal.write(`\r\n${color}[System]\x1b[0m ${message}\r\n`);
+  terminal.write(`${leadingNewline ? '\r\n' : ''}${color}[System]\x1b[0m ${message}\r\n`);
 }
 
 function normalizeOutput(value) {
   return String(value ?? '').replace(/\r?\n/g, '\r\n');
 }
 
-function redrawLine(nextLine) {
-  while (state.currentLine.length) {
-    terminal.write('\b \b');
-    state.currentLine = state.currentLine.slice(0, -1);
-  }
+function redrawLine(nextLine, nextCursorIndex = nextLine.length) {
   state.currentLine = nextLine;
-  terminal.write(nextLine);
+  state.cursorIndex = Math.max(0, Math.min(nextCursorIndex, nextLine.length));
+  terminal.write('\x1b[2K\r');
+  if (!state.isPasswordPrompt) writePrompt();
+  
+  const displayLine = state.isPasswordPrompt 
+    ? '*'.repeat(state.currentLine.length) 
+    : state.currentLine;
+    
+  terminal.write(displayLine);
+  const distanceFromEnd = state.currentLine.length - state.cursorIndex;
+  if (distanceFromEnd) terminal.write(`\x1b[${distanceFromEnd}D`);
+}
+
+function insertText(text) {
+  const before = state.currentLine.slice(0, state.cursorIndex);
+  const after = state.currentLine.slice(state.cursorIndex);
+  redrawLine(`${before}${text}${after}`, state.cursorIndex + text.length);
+}
+
+function moveCursor(nextIndex) {
+  redrawLine(state.currentLine, nextIndex);
+}
+
+function deletePreviousWord() {
+  const before = state.currentLine.slice(0, state.cursorIndex);
+  const trimmed = before.replace(/\s+$/, '');
+  const wordStart = trimmed.search(/\S+$/);
+  const deleteFrom = wordStart === -1 ? trimmed.length : wordStart;
+  redrawLine(
+    `${before.slice(0, deleteFrom)}${state.currentLine.slice(state.cursorIndex)}`,
+    deleteFrom,
+  );
 }
 
 async function loadSyntaxTree() {
@@ -155,6 +222,8 @@ function showSuggestions() {
 
   writePrompt();
   terminal.write(state.currentLine);
+  const distanceFromEnd = state.currentLine.length - state.cursorIndex;
+  if (distanceFromEnd) terminal.write(`\x1b[${distanceFromEnd}D`);
 }
 
 function completeToken() {
@@ -171,8 +240,7 @@ function completeToken() {
   }
 
   const completion = literalSuggestions[0].slice(partial.length);
-  state.currentLine += `${completion} `;
-  terminal.write(`${completion} `);
+  insertText(`${completion} `);
 }
 
 function socketIsOpen() {
@@ -249,7 +317,7 @@ async function submitCommand(command) {
   }
 
   if (!socketIsOpen()) {
-    writeSystem('Conectează mai întâi frontend-ul la backend.', 'error');
+    writeSystem('Conectează mai întâi frontend-ul la backend.', 'error', false);
     writePrompt();
     return;
   }
@@ -316,13 +384,20 @@ function handleBackendMessage(event) {
   }
 
   if (message.action === 'stream_output') {
-    const output = String(message.data ?? '');
+    const output = String(message.data ?? '').replace(/^(?:[ \t]*\r?\n)+/, '');
     detectDeviceOsFromLegacyMessage(output);
     terminal.write(normalizeOutput(output));
-    if (!/\r?\n$/.test(output)) terminal.write('\r\n');
+    
     state.pendingPayload = null;
     state.pendingPreviousMode = null;
-    writePrompt();
+
+    if (/password\s*:/i.test(output)) {
+      state.isPasswordPrompt = true;
+    } else {
+      state.isPasswordPrompt = false;
+      if (!/\r?\n$/.test(output)) terminal.write('\r\n');
+      writePrompt();
+    }
     return;
   }
 
@@ -331,6 +406,7 @@ function handleBackendMessage(event) {
     state.pendingPreviousMode = null;
     state.awaitingCliDecision = true;
     state.currentLine = '';
+    state.cursorIndex = 0;
     terminal.write(`\r\n\x1b[1;33m${normalizeOutput(message.data || message.message)}\x1b[0m\r\nSelect: `);
     return;
   }
@@ -377,6 +453,13 @@ terminal.onData(async (data) => {
     terminal.write('\r\n');
     const line = state.currentLine;
     state.currentLine = '';
+    state.cursorIndex = 0;
+
+    if (state.isPasswordPrompt) {
+      state.isPasswordPrompt = false;
+      await submitCommand(line);
+      return;
+    }
 
     if (state.awaitingCliDecision && /^[12]$/.test(line.trim())) {
       handleCliDecision(line);
@@ -388,10 +471,56 @@ terminal.onData(async (data) => {
   }
 
   if (data === '\u007f') {
-    if (state.currentLine.length) {
-      state.currentLine = state.currentLine.slice(0, -1);
-      terminal.write('\b \b');
+    if (state.cursorIndex > 0) {
+      redrawLine(
+        `${state.currentLine.slice(0, state.cursorIndex - 1)}${state.currentLine.slice(state.cursorIndex)}`,
+        state.cursorIndex - 1,
+      );
     }
+    return;
+  }
+
+  if (data === '\x1b[3~') {
+    if (state.cursorIndex < state.currentLine.length) {
+      redrawLine(
+        `${state.currentLine.slice(0, state.cursorIndex)}${state.currentLine.slice(state.cursorIndex + 1)}`,
+        state.cursorIndex,
+      );
+    }
+    return;
+  }
+
+  if (data === '\x1b[D') {
+    moveCursor(state.cursorIndex - 1);
+    return;
+  }
+
+  if (data === '\x1b[C') {
+    moveCursor(state.cursorIndex + 1);
+    return;
+  }
+
+  if (data === '\x1b[H' || data === '\x1b[1~' || data === '\u0001') {
+    moveCursor(0);
+    return;
+  }
+
+  if (data === '\x1b[F' || data === '\x1b[4~' || data === '\u0005') {
+    moveCursor(state.currentLine.length);
+    return;
+  }
+
+  if (data === '\x1b[1;5D') {
+    const before = state.currentLine.slice(0, state.cursorIndex);
+    const match = before.match(/\S+\s*$/);
+    moveCursor(match ? state.cursorIndex - match[0].length : 0);
+    return;
+  }
+
+  if (data === '\x1b[1;5C') {
+    const after = state.currentLine.slice(state.cursorIndex);
+    const match = after.match(/^\s*\S+/);
+    moveCursor(match ? state.cursorIndex + match[0].length : state.currentLine.length);
     return;
   }
 
@@ -408,6 +537,7 @@ terminal.onData(async (data) => {
   if (data === '\u0003') {
     terminal.write('^C\r\n');
     state.currentLine = '';
+    state.cursorIndex = 0;
     state.pendingPayload = null;
     state.pendingPreviousMode = null;
     writePrompt();
@@ -426,9 +556,37 @@ terminal.onData(async (data) => {
     return;
   }
 
-  if (/^[\x20-\x7E]+$/.test(data)) {
-    state.currentLine += data;
-    terminal.write(data);
+  if (data === '\u000c') {
+    terminal.clear();
+    redrawLine(state.currentLine, state.cursorIndex);
+    return;
+  }
+
+  if (data === '\u0015') {
+    redrawLine(state.currentLine.slice(state.cursorIndex), 0);
+    return;
+  }
+
+  if (data === '\u000b') {
+    redrawLine(state.currentLine.slice(0, state.cursorIndex), state.cursorIndex);
+    return;
+  }
+
+  if (data === '\u0017') {
+    deletePreviousWord();
+    return;
+  }
+
+  if (data === '\u0012') {
+    if (state.history.length) {
+      state.historyIndex = Math.max(0, state.historyIndex - 1);
+      redrawLine(state.history[state.historyIndex] || '');
+    }
+    return;
+  }
+
+  if ([...data].every((character) => character >= ' ' && character !== '\u007f')) {
+    insertText(data);
   }
 });
 
@@ -449,7 +607,7 @@ elements.form.addEventListener('submit', async (event) => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const query = new URLSearchParams({
     syntax: elements.syntax.value,
-    role: elements.role.value,
+    role: 'auto',
   });
 
   state.socket = new WebSocket(

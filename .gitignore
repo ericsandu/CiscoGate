@@ -2,4 +2,14 @@ __MACOSX/
 __pycache__/
 *venv*/
 *.env
+ciscogate_venv/
+node_modules/
+dist/
+.vite/
+*.log
+
+# Python
+.venv/
+*.py[cod]
+
 data
