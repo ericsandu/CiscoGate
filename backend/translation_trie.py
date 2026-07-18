@@ -64,6 +64,8 @@ class TranslationTrie:
 
         # 1. Exact match attempt
         if next_token in current_node:
+            if next_token == "<VAR>":
+                captured_vars.append(next_token)
             return self._traverse(
                 tokens[1:], current_node[next_token], captured_vars, role
             )

@@ -156,7 +156,7 @@ class ConnectionManager:
                         },
                     )
                     await session.ws.close()
-                    del self.active_connections[session_id]
+                    del self.active_clients[session_id]
             return
 
         # ZKT Architecture: The frontend sends a sanitized template and encrypted variables
@@ -209,9 +209,11 @@ class ConnectionManager:
                 )
             elif session.direct_bridge:
                 try:
+                    print(f"[DEBUG] template={template!r}, e2e_vars={e2e_vars!r}")
                     final_command = session.direct_bridge.reconstruct_command(
                         translated_template, e2e_vars
                     )
+                    print(f"[DEBUG] translated_template={translated_template!r}, final_command={final_command!r}")
                     output = await asyncio.to_thread(
                         session.direct_bridge.net_connect.send_command_timing,
                         final_command,
