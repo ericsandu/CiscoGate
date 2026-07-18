@@ -1,5 +1,5 @@
 __MACOSX/
 __pycache__/
-.venv/
+*venv*/
 *.env
-ciscogate_venv/
+data
