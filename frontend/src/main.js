@@ -319,10 +319,17 @@ function handleBackendMessage(event) {
     const output = String(message.data ?? '');
     detectDeviceOsFromLegacyMessage(output);
     terminal.write(normalizeOutput(output));
-    if (!/\r?\n$/.test(output)) terminal.write('\r\n');
+    
     state.pendingPayload = null;
     state.pendingPreviousMode = null;
-    writePrompt();
+
+    if (/password\s*:/i.test(output)) {
+      state.isPasswordPrompt = true;
+    } else {
+      state.isPasswordPrompt = false;
+      if (!/\r?\n$/.test(output)) terminal.write('\r\n');
+      writePrompt();
+    }
     return;
   }
 
@@ -378,6 +385,12 @@ terminal.onData(async (data) => {
     const line = state.currentLine;
     state.currentLine = '';
 
+    if (state.isPasswordPrompt) {
+      state.isPasswordPrompt = false;
+      await submitCommand(line);
+      return;
+    }
+
     if (state.awaitingCliDecision && /^[12]$/.test(line.trim())) {
       handleCliDecision(line);
       writePrompt();
@@ -428,7 +441,11 @@ terminal.onData(async (data) => {
 
   if (/^[\x20-\x7E]+$/.test(data)) {
     state.currentLine += data;
-    terminal.write(data);
+    if (state.isPasswordPrompt) {
+      terminal.write('*');
+    } else {
+      terminal.write(data);
+    }
   }
 });
 
