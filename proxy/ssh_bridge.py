@@ -24,6 +24,14 @@ class SSHBridge:
         print(f"[SSHBridge] Connecting to switch at {self.device['host']}...")
         self.net_connect = ConnectHandler(**self.device)
         detected_os = self.net_connect.device_type
+        
+        # Normalize netmiko's specific OS types to our backend dictionary schemas
+        detected_os_lower = detected_os.lower()
+        if "cisco" in detected_os_lower:
+            detected_os = "cisco_ios"
+        elif "forti" in detected_os_lower:
+            detected_os = "fortios"
+            
         print(f"[SSHBridge] Successfully connected! Detected OS: {detected_os}")
         return detected_os
 
