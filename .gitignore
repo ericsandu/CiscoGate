@@ -13,3 +13,4 @@ dist/
 *.py[cod]
 
 data
+ssh_host_rsa_key*
