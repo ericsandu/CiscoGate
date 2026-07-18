@@ -8,7 +8,6 @@ import './styles.css';
 const elements = {
   form: document.querySelector('#connection-form'),
   syntax: document.querySelector('#syntax'),
-  role: document.querySelector('#role'),
   target: document.querySelector('#target'),
   port: document.querySelector('#port'),
   username: document.querySelector('#username'),
@@ -83,8 +82,8 @@ function makeSessionId() {
 }
 
 function promptText() {
-  const roleNames = { firewall: 'Firewall', router: 'Router', switch: 'Switch' };
-  const name = roleNames[elements.role.value] || 'Device';
+  const deviceNames = { cisco_ios: 'Cisco', fortios: 'FortiGate' };
+  const name = deviceNames[state.deviceOs] || 'Device';
 
   if (elements.syntax.value === 'fortios') {
     if (state.currentMode === 'global_config') return `${name} (global) # `;
@@ -449,7 +448,7 @@ elements.form.addEventListener('submit', async (event) => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const query = new URLSearchParams({
     syntax: elements.syntax.value,
-    role: elements.role.value,
+    role: 'auto',
   });
 
   state.socket = new WebSocket(
